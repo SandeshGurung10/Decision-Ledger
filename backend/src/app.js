@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import AppError from './utils/AppError.js';
+import errorHandler from './middleware/errorHandler.js';
 
 const app = express();
 
@@ -16,5 +18,11 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/api/v1/health', (req, res) => {
   res.status(200).json({ status: 'success', message: 'Server is healthy' });
 });
+
+app.all('*', (req, res, next) => {
+  next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
+});
+
+app.use(errorHandler);
 
 export default app;
