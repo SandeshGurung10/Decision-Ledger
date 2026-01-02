@@ -7,6 +7,8 @@ import errorHandler from './middleware/errorHandler.js';
 
 import authRoutes from './routes/authRoutes.js';
 
+import userRoutes from './routes/userRoutes.js';
+
 const app = express();
 
 // Middleware
@@ -18,6 +20,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', userRoutes);
 
 // Basic health check route
 app.get('/api/v1/health', (req, res) => {
