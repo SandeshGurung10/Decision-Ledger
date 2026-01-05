@@ -36,3 +36,18 @@ export const loginValidationRules = () => {
     body('password').notEmpty().withMessage('Password is required'),
   ];
 };
+
+export const decisionValidationRules = () => {
+  return [
+    body('title')
+      .notEmpty()
+      .withMessage('Title is required')
+      .isLength({ max: 150 })
+      .withMessage('Title cannot exceed 150 characters'),
+    body('description').notEmpty().withMessage('Description is required'),
+    body('rationale').notEmpty().withMessage('Rationale is required'),
+    body('category')
+      .isIn(['Strategic', 'Operational', 'Financial', 'HR', 'Technical', 'Other'])
+      .withMessage('Please provide a valid category'),
+  ];
+};
