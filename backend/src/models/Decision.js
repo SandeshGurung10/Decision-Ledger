@@ -75,6 +75,8 @@ const decisionSchema = new mongoose.Schema(
 decisionSchema.index({ category: 1 });
 decisionSchema.index({ status: 1 });
 decisionSchema.index({ createdBy: 1 });
+decisionSchema.index({ createdAt: -1 });
+decisionSchema.index({ isArchived: 1, status: 1 });
 
 const Decision = mongoose.model('Decision', decisionSchema);
 
