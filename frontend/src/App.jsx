@@ -2,16 +2,14 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { MainLayout } from './components/layout/MainLayout';
+import { Dashboard } from './pages/Dashboard';
+import { DecisionList } from './pages/DecisionList';
+import { DecisionDetail } from './pages/DecisionDetail';
+import { DecisionForm } from './pages/DecisionForm';
+import { UserManagement } from './pages/UserManagement';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
-
-// A temporary placeholder for Home/Dashboard
-const DashboardPlaceholder = () => (
-    <div className="card text-center p-12">
-        <h2 className="text-2xl font-bold mb-4">Dashboard Coming Soon</h2>
-        <p>You are successfully authenticated!</p>
-    </div>
-);
 
 function App() {
     return (
@@ -27,14 +25,20 @@ function App() {
                             <Route path="/register" element={<Register />} />
 
                             {/* Protected Routes */}
-                            <Route
-                                path="/"
-                                element={
-                                    <ProtectedRoute>
-                                        <DashboardPlaceholder />
-                                    </ProtectedRoute>
-                                }
-                            />
+                            <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+                                <Route path="/" element={<Dashboard />} />
+                                <Route path="/decisions" element={<DecisionList />} />
+                                <Route path="/decisions/new" element={<DecisionForm />} />
+                                <Route path="/decisions/:id" element={<DecisionDetail />} />
+                                <Route
+                                    path="/users"
+                                    element={
+                                        <ProtectedRoute allowedRoles={['Admin']}>
+                                            <UserManagement />
+                                        </ProtectedRoute>
+                                    }
+                                />
+                            </Route>
                         </Routes>
 
                     </main>
