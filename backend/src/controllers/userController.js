@@ -1,105 +1,111 @@
 import User from '../models/User.js';
 import AppError from '../utils/AppError.js';
 
+// Set req.params.id to current user
 export const getMe = (req, res, next) => {
-  req.params.id = req.user.id;
+  req.params.id = req.user._id;
   next();
 };
 
+// GET single user
 export const getUser = async (req, res, next) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findById(req.params.id).select(
+      '-password -passwordResetToken -active'
+    );
 
-    if (!user) {
-      return next(new AppError('No user found with that ID', 404));
-    }
+    if (!user) return next(new AppError('No user found with that ID', 404));
 
     res.status(200).json({
       status: 'success',
-      data: {
-        user,
-      },
+      data: { user },
     });
   } catch (err) {
     next(err);
   }
 };
 
+// UPDATE current user (self)
 export const updateMe = async (req, res, next) => {
   try {
-    // 1) Create error if user POSTs password data
-    if (req.body.password) {
+    if (req.body.password || req.body.role) {
       return next(
-        new AppError(
-          'This route is not for password updates. Please use /updateMyPassword.',
-          400
-        )
+        new AppError('This route is not for password or role updates', 400)
       );
     }
 
-    // 2) Filter out unwanted fields names that are not allowed to be updated
+    const allowedFields = ['name', 'department', 'email'];
     const filteredBody = {};
-    if (req.body.name) filteredBody.name = req.body.name;
-    if (req.body.department) filteredBody.department = req.body.department;
+    allowedFields.forEach((field) => {
+      if (req.body[field]) filteredBody[field] = req.body[field];
+    });
 
-    // 3) Update user document
-    const updatedUser = await User.findByIdAndUpdate(
-      req.user.id,
-      filteredBody,
-      {
-        new: true,
-        runValidators: true,
+    // Check for duplicate email
+    if (filteredBody.email) {
+      const existingUser = await User.findOne({ email: filteredBody.email });
+      if (existingUser && existingUser._id.toString() !== req.user._id.toString()) {
+        return next(new AppError('Email already in use', 400));
       }
-    );
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      filteredBody,
+      { new: true, runValidators: true }
+    ).select('-password -passwordResetToken -active');
 
     res.status(200).json({
       status: 'success',
-      data: {
-        user: updatedUser,
-      },
+      data: { user: updatedUser },
     });
   } catch (err) {
     next(err);
   }
 };
 
+// GET all users (Admin only)
 export const getAllUsers = async (req, res, next) => {
   try {
-    const users = await User.find();
+    const users = await User.find().select('-password -passwordResetToken -active');
 
     res.status(200).json({
       status: 'success',
       results: users.length,
-      data: {
-        users,
-      },
+      data: { users },
     });
   } catch (err) {
     next(err);
   }
 };
 
-// Admin only
+// UPDATE user role (Admin only)
 export const updateUserRole = async (req, res, next) => {
   try {
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { role: req.body.role },
-      {
-        new: true,
-        runValidators: true,
-      }
+    const { role } = req.body;
+    const validRoles = ['Admin', 'Decision-Maker', 'Viewer'];
+
+    if (!role || !validRoles.includes(role)) { 
+      return next(new AppError('Invalid role', 400));
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) return next(new AppError('No user found with that ID', 404));
+
+    user.role = role; 
+    await user.save();
+
+    // Audit log
+    console.log(
+      `Admin ${req.user.email} changed role of ${user.email} to ${user.role}`
     );
 
-    if (!user) {
-      return next(new AppError('No user found with that ID', 404));
-    }
+    const sanitizedUser = await User.findById(user._id).select(
+      '-password -passwordResetToken -active'
+    );
 
     res.status(200).json({
       status: 'success',
-      data: {
-        user,
-      },
+      data: { user: sanitizedUser },
     });
   } catch (err) {
     next(err);

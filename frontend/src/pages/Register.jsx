@@ -1,23 +1,20 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
-import toast from 'react-hot-toast';
 
 export const Register = () => {
-    const { register, handleSubmit, formState: { errors }, watch } = useForm();
+    const { register: registerField, handleSubmit, formState: { errors }, watch } = useForm();
     const navigate = useNavigate();
+    const { register } = useAuth();
 
     const onSubmit = async (data) => {
-        try {
-            // API call will go here
-            console.log('Register data', data);
-            toast.success('Registration successful!');
+        const success = await register(data);
+        if (success) {
             navigate('/');
-        } catch (error) {
-            toast.error('Failed to register');
         }
     };
 
@@ -37,7 +34,7 @@ export const Register = () => {
                             type="text"
                             id="name"
                             placeholder="John Doe"
-                            {...register('name', {
+                            {...registerField('name', {
                                 required: 'Name is required'
                             })}
                             error={errors.name?.message}
@@ -48,7 +45,7 @@ export const Register = () => {
                             type="email"
                             id="email"
                             placeholder="you@example.com"
-                            {...register('email', {
+                            {...registerField('email', {
                                 required: 'Email is required',
                                 pattern: {
                                     value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
@@ -63,7 +60,7 @@ export const Register = () => {
                             type="password"
                             id="password"
                             placeholder="••••••••"
-                            {...register('password', {
+                            {...registerField('password', {
                                 required: 'Password is required',
                                 minLength: {
                                     value: 8,
@@ -78,7 +75,7 @@ export const Register = () => {
                             type="password"
                             id="passwordConfirm"
                             placeholder="••••••••"
-                            {...register('passwordConfirm', {
+                            {...registerField('passwordConfirm', {
                                 required: 'Please confirm your password',
                                 validate: (val) => {
                                     if (watch('password') != val) {
@@ -98,7 +95,7 @@ export const Register = () => {
                                 type="text"
                                 placeholder="e.g. Engineering"
                                 className="input-field"
-                                {...register('department')}
+                                {...registerField('department')}
                             />
                         </div>
 

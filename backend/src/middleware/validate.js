@@ -1,6 +1,7 @@
 import { body, validationResult } from 'express-validator';
 import AppError from '../utils/AppError.js';
 
+// Middleware to handle validation results
 export const validate = (validations) => {
   return async (req, res, next) => {
     for (let validation of validations) {
@@ -16,10 +17,13 @@ export const validate = (validations) => {
     const extractedErrors = [];
     errors.array().map((err) => extractedErrors.push({ [err.path]: err.msg }));
 
-    return next(new AppError(`Validation Error: ${JSON.stringify(extractedErrors)}`, 400));
+    return next(
+      new AppError(`Validation Error: ${JSON.stringify(extractedErrors)}`, 400)
+    );
   };
 };
 
+// User registration validation rules
 export const userValidationRules = () => {
   return [
     body('name').notEmpty().withMessage('Name is required'),
@@ -27,9 +31,15 @@ export const userValidationRules = () => {
     body('password')
       .isLength({ min: 8 })
       .withMessage('Password must be at least 8 characters long'),
+    body('passwordConfirm')
+      .notEmpty()
+      .withMessage('Please confirm your password')
+      .custom((value, { req }) => value === req.body.password)
+      .withMessage('Passwords do not match'),
   ];
 };
 
+// User login validation rules
 export const loginValidationRules = () => {
   return [
     body('email').isEmail().withMessage('Must be a valid email address'),
@@ -37,6 +47,7 @@ export const loginValidationRules = () => {
   ];
 };
 
+// Decision creation/update validation rules
 export const decisionValidationRules = () => {
   return [
     body('title')

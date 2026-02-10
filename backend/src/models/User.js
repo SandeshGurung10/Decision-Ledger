@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema(
       required: [true, 'Please provide your email'],
       unique: true,
       lowercase: true,
+      index: true,
       match: [
         /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
         'Please provide a valid email',
@@ -24,6 +25,16 @@ const userSchema = new mongoose.Schema(
       minlength: 8,
       select: false,
     },
+    passwordConfirm: {
+      type: String,
+      required: [true, 'Please confirm your password'],
+      validate: {
+        validator: function (el) {
+          return el === this.password;
+        },
+        message: 'Passwords do not match',
+      },
+    },
     role: {
       type: String,
       enum: ['Admin', 'Decision-Maker', 'Viewer'],
@@ -33,19 +44,35 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    passwordChangedAt: Date,
+    passwordResetToken: { type: String, select: false },
+    passwordResetExpires: Date,
+    active: {
+      type: Boolean,
+      default: true,
+      select: false,
+    },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// Hash password before saving to DB
+// Hide inactive users automatically
+userSchema.pre(/^find/, function (next) {
+  this.find({ active: { $ne: false } });
+  next();
+});
+
+// Hash password before save
 userSchema.pre('save', async function (next) {
-  // Only run this function if password was actually modified
   if (!this.isModified('password')) return next();
 
-  // Hash the password with cost of 12
   this.password = await bcrypt.hash(this.password, 12);
+  this.passwordConfirm = undefined;
+
+  if (!this.isNew) {
+    this.passwordChangedAt = Date.now() - 1000;
+  }
+
   next();
 });
 

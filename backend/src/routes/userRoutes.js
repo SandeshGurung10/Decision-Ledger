@@ -10,16 +10,18 @@ import { protect, restrictTo } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Protect all routes after this middleware
+// Protect all routes: user must be logged in
 router.use(protect);
 
+// --- SELF routes (accessible to the logged-in user only) ---
 router.get('/me', getMe, getUser);
 router.patch('/updateMe', updateMe);
 
-// Restrict all routes after this middleware to Admin only
-router.use(restrictTo('Admin'));
-
+// --- ADMIN-only routes ---
+router.use(restrictTo('Admin')); 
 router.route('/').get(getAllUsers);
-router.route('/:id').get(getUser).patch(updateUserRole);
+router.route('/:id')
+  .get(getUser)
+  .patch(updateUserRole);
 
 export default router;

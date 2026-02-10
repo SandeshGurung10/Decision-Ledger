@@ -7,6 +7,7 @@ const AuthContext = createContext();
 // Create default base URL for API calls
 export const api = axios.create({
     baseURL: 'http://localhost:5000/api/v1',
+    
 });
 
 // Add interceptor to include token
@@ -44,8 +45,8 @@ export const AuthProvider = ({ children }) => {
     const login = async (email, password) => {
         try {
             const res = await api.post('/auth/login', { email, password });
-            setUser(res.data.data.user);
             localStorage.setItem('token', res.data.token);
+            setUser(res.data.data.user);
             toast.success('Successfully logged in!');
             return true;
         } catch (error) {
@@ -57,8 +58,8 @@ export const AuthProvider = ({ children }) => {
     const register = async (userData) => {
         try {
             const res = await api.post('/auth/register', userData);
-            setUser(res.data.data.user);
             localStorage.setItem('token', res.data.token);
+            setUser(res.data.data.user);
             toast.success('Registration successful!');
             return true;
         } catch (error) {

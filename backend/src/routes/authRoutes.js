@@ -4,7 +4,11 @@ import { validate, userValidationRules, loginValidationRules } from '../middlewa
 
 const router = express.Router();
 
+// -------------------- Public Routes -------------------- //
+// Register new users (role is forced to 'Decision-Maker' in controller)
 router.post('/register', validate(userValidationRules()), register);
+
+// Login users
 router.post('/login', validate(loginValidationRules()), login);
 
 export default router;
