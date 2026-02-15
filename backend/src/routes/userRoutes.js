@@ -4,24 +4,24 @@ import {
   getUser,
   updateMe,
   getAllUsers,
-  updateUserRole,
+  updateUser,
 } from '../controllers/userController.js';
 import { protect, restrictTo } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Protect all routes: user must be logged in
+// Protect all routes
 router.use(protect);
 
-// --- SELF routes (accessible to the logged-in user only) ---
+// --- SELF routes ---
 router.get('/me', getMe, getUser);
 router.patch('/updateMe', updateMe);
 
 // --- ADMIN-only routes ---
-router.use(restrictTo('Admin')); 
+router.use(restrictTo('Admin'));
 router.route('/').get(getAllUsers);
 router.route('/:id')
   .get(getUser)
-  .patch(updateUserRole);
+  .patch(updateUser);
 
 export default router;

@@ -26,15 +26,17 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
     passwordConfirm: {
-      type: String,
-      required: [true, 'Please confirm your password'],
-      validate: {
-        validator: function (el) {
-          return el === this.password;
-        },
-        message: 'Passwords do not match',
-      },
+  type: String,
+  required: [function () {
+    return this.isNew || this.isModified('password');
+  }, 'Please confirm your password'],
+  validate: {
+    validator: function (el) {
+      return el === this.password;
     },
+    message: 'Passwords do not match',
+  },
+},
     role: {
       type: String,
       enum: ['Admin', 'Decision-Maker', 'Viewer'],

@@ -11,7 +11,7 @@ export const createDecision = async (req, res, next) => {
   try {
     const newDecision = await Decision.create({
       ...req.body,
-      createdBy: req.user._id, 
+      createdBy: req.user._id,
     });
 
     res.status(201).json({
@@ -23,20 +23,30 @@ export const createDecision = async (req, res, next) => {
   }
 };
 
-
+// GET all decisions 
 export const getAllDecisions = async (req, res, next) => {
   try {
     const queryObj = { ...req.query };
     const excludedFields = ['page', 'sort', 'limit', 'fields'];
     excludedFields.forEach((el) => delete queryObj[el]);
 
-
-    if (req.user.role === 'Decision-Maker') {
-      queryObj.createdBy = req.user._id; 
-    } else if (req.user.role === 'Viewer') {
-      queryObj.status = 'Approved'; 
+    // Handle archived filter
+    if (queryObj.isArchived === 'all') {
+      delete queryObj.isArchived; // Show all
+    } else if (queryObj.isArchived === 'true') {
+      queryObj.isArchived = true; // Show only archived
+    } else {
+      queryObj.isArchived = false; // Show only non-archived (default)
     }
-    
+
+    //  Role-based visibility
+    if (req.user.role === 'Decision-Maker') {
+      queryObj.createdBy = req.user._id; // only own decisions
+    } else if (req.user.role === 'Viewer') {
+      queryObj.status = 'Approved'; // only approved decisions
+    }
+    // Admin sees all → no filter
+
     let query = Decision.find(queryObj).populate('createdBy', 'name email');
 
     // Sorting
@@ -55,9 +65,15 @@ export const getAllDecisions = async (req, res, next) => {
 
     const decisions = await query;
 
+    // Get total count for pagination
+    const total = await Decision.countDocuments(queryObj);
+
     res.status(200).json({
       status: 'success',
       results: decisions.length,
+      total: total,
+      page: page,
+      totalPages: Math.ceil(total / limit),
       data: { decisions },
     });
   } catch (err) {
@@ -65,7 +81,7 @@ export const getAllDecisions = async (req, res, next) => {
   }
 };
 
-// GET single decision
+// GET single decision with permission check
 export const getDecision = async (req, res, next) => {
   try {
     const decision = await Decision.findById(req.params.id)
@@ -73,7 +89,23 @@ export const getDecision = async (req, res, next) => {
       .populate('reviewedBy', 'name email')
       .populate('stakeholders', 'name email');
 
-    if (!decision) return next(new AppError('No decision found with that ID', 404));
+    if (!decision) {
+      return next(new AppError('No decision found with that ID', 404));
+    }
+
+    //  Permission checks
+    if (req.user.role === 'Viewer' && decision.status !== 'Approved') {
+      return next(new AppError('You do not have permission to view this decision', 403));
+    }
+
+    if (req.user.role === 'Decision-Maker') {
+      const isOwner = decision.createdBy._id.equals(req.user._id);
+      const isApproved = decision.status === 'Approved';
+      
+      if (!isOwner && !isApproved) {
+        return next(new AppError('You do not have permission to view this decision', 403));
+      }
+    }
 
     res.status(200).json({
       status: 'success',
@@ -87,15 +119,22 @@ export const getDecision = async (req, res, next) => {
 // UPDATE decision – creator or admin only
 export const updateDecision = async (req, res, next) => {
   try {
-   
-    if (req.body.createdBy || req.body.isArchived) {
+    // Prevent changing these fields
+    if (req.body.createdBy || req.body.isArchived || req.body.reviewedBy) {
       return next(
-        new AppError('You cannot update createdBy or isArchived fields here', 400)
+        new AppError('You cannot update createdBy, isArchived, or reviewedBy fields here', 400)
       );
     }
 
     const decision = await Decision.findById(req.params.id);
-    if (!decision) return next(new AppError('No decision found with that ID', 404));
+    if (!decision) {
+      return next(new AppError('No decision found with that ID', 404));
+    }
+
+    //  Check if archived
+    if (decision.isArchived) {
+      return next(new AppError('Cannot update archived decisions. Unarchive first.', 400));
+    }
 
     if (!checkOwnershipOrAdmin(decision, req.user)) {
       return next(
@@ -119,7 +158,13 @@ export const updateDecision = async (req, res, next) => {
 export const archiveDecision = async (req, res, next) => {
   try {
     const decision = await Decision.findById(req.params.id);
-    if (!decision) return next(new AppError('No decision found with that ID', 404));
+    if (!decision) {
+      return next(new AppError('No decision found with that ID', 404));
+    }
+
+    if (decision.isArchived) {
+      return next(new AppError('Decision is already archived', 400));
+    }
 
     if (!checkOwnershipOrAdmin(decision, req.user)) {
       return next(
@@ -134,6 +179,77 @@ export const archiveDecision = async (req, res, next) => {
       status: 'success',
       message: 'Decision successfully archived',
       data: { decision },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+//  NEW: UNARCHIVE decision – creator or admin only
+export const unarchiveDecision = async (req, res, next) => {
+  try {
+    const decision = await Decision.findById(req.params.id);
+    
+    if (!decision) {
+      return next(new AppError('No decision found with that ID', 404));
+    }
+
+    if (!decision.isArchived) {
+      return next(new AppError('Decision is not archived', 400));
+    }
+
+    if (!checkOwnershipOrAdmin(decision, req.user)) {
+      return next(
+        new AppError('You do not have permission to unarchive this decision', 403)
+      );
+    }
+
+    decision.isArchived = false;
+    await decision.save();
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Decision successfully unarchived',
+      data: { decision },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ✅ NEW: REVIEW decision (Admin only)
+export const reviewDecision = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    
+    const validStatuses = ['Approved', 'Rejected'];
+    if (!validStatuses.includes(status)) {
+      return next(new AppError('Status must be Approved or Rejected', 400));
+    }
+
+    const decision = await Decision.findById(req.params.id);
+    if (!decision) {
+      return next(new AppError('No decision found with that ID', 404));
+    }
+
+    if (decision.isArchived) {
+      return next(new AppError('Cannot review archived decisions', 400));
+    }
+
+    // Update decision
+    decision.status = status;
+    decision.reviewedBy = req.user._id;
+    decision.decidedAt = Date.now();
+    await decision.save();
+
+    const updatedDecision = await Decision.findById(decision._id)
+      .populate('createdBy', 'name email')
+      .populate('reviewedBy', 'name email');
+
+    res.status(200).json({
+      status: 'success',
+      message: `Decision ${status.toLowerCase()}`,
+      data: { decision: updatedDecision },
     });
   } catch (err) {
     next(err);

@@ -25,15 +25,27 @@ const createSendToken = (user, statusCode, res) => {
 
 export const register = async (req, res, next) => {
   try {
-    const { name, email, password, passwordConfirm, department } = req.body;
+    const { name, email, password, passwordConfirm, department, role } = req.body;
+
+    const allowedRegisterRoles = ["Viewer", "Decision-Maker"];
+
+    
+    if (role && !allowedRegisterRoles.includes(role)) {
+      return next(
+        new AppError(
+          "Invalid role. You can only register as Viewer or Decision-Maker.",
+          400
+        )
+      );
+    }
 
     const newUser = await User.create({
       name,
       email,
       password,
       passwordConfirm,
-      role: 'Decision-Maker',
       department,
+      role: role || "Viewer", // default if not provided
     });
 
     createSendToken(newUser, 201, res);

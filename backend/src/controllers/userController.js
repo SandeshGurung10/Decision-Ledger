@@ -78,34 +78,62 @@ export const getAllUsers = async (req, res, next) => {
   }
 };
 
-// UPDATE user role (Admin only)
-export const updateUserRole = async (req, res, next) => {
+// UPDATE user (Admin only) - role, name, department
+export const updateUser = async (req, res, next) => {
   try {
-    const { role } = req.body;
-    const validRoles = ['Admin', 'Decision-Maker', 'Viewer'];
+    const { role, name, department } = req.body;
+    
+    // Define allowed fields for admin to update
+    const allowedFields = {};
+    
+    // Validate and add role if provided
+    if (role) {
+      const validRoles = ['Admin', 'Decision-Maker', 'Viewer'];
+      if (!validRoles.includes(role)) {
+        return next(new AppError('Invalid role. Must be Admin, Decision-Maker, or Viewer', 400));
+      }
+      allowedFields.role = role;
+    }
+    
+    // Add name if provided
+    if (name) {
+      if (name.trim().length === 0) {
+        return next(new AppError('Name cannot be empty', 400));
+      }
+      allowedFields.name = name.trim();
+    }
+    
+    // Add department if provided
+    if (department) {
+      allowedFields.department = department.trim();
+    }
+    
+    // Check if at least one field is being updated
+    if (Object.keys(allowedFields).length === 0) {
+      return next(new AppError('Please provide at least one field to update (role, name, or department)', 400));
+    }
+    
+    // Find and update user
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      allowedFields,
+      { new: true, runValidators: true }
+    ).select('-password -passwordResetToken -active');
 
-    if (!role || !validRoles.includes(role)) { 
-      return next(new AppError('Invalid role', 400));
+    if (!updatedUser) {
+      return next(new AppError('No user found with that ID', 404));
     }
 
-    const user = await User.findById(req.params.id);
-    if (!user) return next(new AppError('No user found with that ID', 404));
-
-    user.role = role; 
-    await user.save();
-
-    // Audit log
+    // Audit log - show what was changed
+    const changedFields = Object.keys(allowedFields).join(', ');
     console.log(
-      `Admin ${req.user.email} changed role of ${user.email} to ${user.role}`
-    );
-
-    const sanitizedUser = await User.findById(user._id).select(
-      '-password -passwordResetToken -active'
+      `Admin ${req.user.email} updated ${updatedUser.email}: Changed ${changedFields}`
     );
 
     res.status(200).json({
       status: 'success',
-      data: { user: sanitizedUser },
+      message: `Successfully updated user's ${changedFields}`,
+      data: { user: updatedUser },
     });
   } catch (err) {
     next(err);

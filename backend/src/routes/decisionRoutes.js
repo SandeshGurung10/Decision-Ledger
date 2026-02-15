@@ -5,6 +5,8 @@ import {
   getDecision,
   updateDecision,
   archiveDecision,
+  unarchiveDecision,   // ✅ NEW
+  reviewDecision,      // ✅ NEW
 } from '../controllers/decisionController.js';
 import { protect, restrictTo } from '../middleware/authMiddleware.js';
 import { validate, decisionValidationRules } from '../middleware/validate.js';
@@ -17,39 +19,51 @@ router.use(protect);
 // ========================
 // ROUTE: GET / POST
 // ========================
-
-// GET all decisions (role-aware)
 router
   .route('/')
   .get(getAllDecisions)
   .post(
-    restrictTo('Admin', 'Decision-Maker'), // Only Admin or Decision-Maker can create
+    restrictTo('Admin', 'Decision-Maker'),
     validate(decisionValidationRules()),
     createDecision
   );
 
 // ========================
-// ROUTE: GET / PATCH
+// ROUTE: GET / PATCH (single decision)
 // ========================
-
-// GET single decision / PATCH update
 router
   .route('/:id')
   .get(getDecision)
   .patch(
-    restrictTo('Admin', 'Decision-Maker'), // Only Admin or Decision-Maker can attempt update
-    updateDecision // Ownership enforced inside controller
+    restrictTo('Admin', 'Decision-Maker'),
+    updateDecision
   );
 
 // ========================
-// ROUTE: PATCH Archive
+// ROUTE: Archive/Unarchive
 // ========================
-
 router
   .route('/:id/archive')
   .patch(
-    restrictTo('Admin', 'Decision-Maker'), // Only Admin or Decision-Maker can attempt archive
-    archiveDecision // Ownership enforced inside controller
+    restrictTo('Admin', 'Decision-Maker'),
+    archiveDecision
+  );
+
+router
+  .route('/:id/unarchive')
+  .patch(
+    restrictTo('Admin', 'Decision-Maker'),
+    unarchiveDecision  // ✅ NEW
+  );
+
+// ========================
+// ROUTE: Review (Admin only)
+// ========================
+router
+  .route('/:id/review')
+  .patch(
+    restrictTo('Admin'),
+    reviewDecision  // ✅ NEW
   );
 
 export default router;
