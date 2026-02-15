@@ -139,3 +139,63 @@ export const updateUser = async (req, res, next) => {
     next(err);
   }
 };
+
+// SOFT DELETE user (Admin only) - sets active to false
+export const deleteUser = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    
+    if (!user) {
+      return next(new AppError('No user found with that ID', 404));
+    }
+
+    // Prevent deleting yourself
+    if (user._id.equals(req.user._id)) {
+      return next(new AppError('You cannot delete your own account', 400));
+    }
+
+    // Prevent deleting the last admin
+    if (user.role === 'Admin') {
+      const adminCount = await User.countDocuments({ role: 'Admin', active: true });
+      if (adminCount <= 1) {
+        return next(new AppError('Cannot delete the last admin user', 400));
+      }
+    }
+
+    // Soft delete - set active to false
+    user.active = false;
+    await user.save();
+
+    res.status(204).json({
+      status: 'success',
+      data: null,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// DELETE current user (self-delete)
+export const deleteMe = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    // Prevent last admin from deleting themselves
+    if (user.role === 'Admin') {
+      const adminCount = await User.countDocuments({ role: 'Admin', active: true });
+      if (adminCount <= 1) {
+        return next(new AppError('Cannot delete the last admin user', 400));
+      }
+    }
+
+    // Soft delete - set active to false
+    await User.findByIdAndUpdate(req.user._id, { active: false });
+
+    res.status(204).json({
+      status: 'success',
+      data: null,
+    });
+  } catch (err) {
+    next(err);
+  }
+};

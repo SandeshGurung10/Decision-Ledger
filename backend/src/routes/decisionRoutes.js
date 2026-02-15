@@ -4,21 +4,18 @@ import {
   getAllDecisions,
   getDecision,
   updateDecision,
+  deleteDecision,      
   archiveDecision,
-  unarchiveDecision,   // ✅ NEW
-  reviewDecision,      // ✅ NEW
+  unarchiveDecision,
+  reviewDecision,
 } from '../controllers/decisionController.js';
 import { protect, restrictTo } from '../middleware/authMiddleware.js';
 import { validate, decisionValidationRules } from '../middleware/validate.js';
 
 const router = express.Router();
 
-// 🔒 Protect all routes – user must be logged in
 router.use(protect);
 
-// ========================
-// ROUTE: GET / POST
-// ========================
 router
   .route('/')
   .get(getAllDecisions)
@@ -28,20 +25,18 @@ router
     createDecision
   );
 
-// ========================
-// ROUTE: GET / PATCH (single decision)
-// ========================
 router
   .route('/:id')
   .get(getDecision)
   .patch(
     restrictTo('Admin', 'Decision-Maker'),
     updateDecision
+  )
+  .delete(
+    restrictTo('Admin', 'Decision-Maker'), 
+    deleteDecision
   );
 
-// ========================
-// ROUTE: Archive/Unarchive
-// ========================
 router
   .route('/:id/archive')
   .patch(
@@ -53,17 +48,14 @@ router
   .route('/:id/unarchive')
   .patch(
     restrictTo('Admin', 'Decision-Maker'),
-    unarchiveDecision  // ✅ NEW
+    unarchiveDecision
   );
 
-// ========================
-// ROUTE: Review (Admin only)
-// ========================
 router
   .route('/:id/review')
   .patch(
     restrictTo('Admin'),
-    reviewDecision  // ✅ NEW
+    reviewDecision
   );
 
 export default router;

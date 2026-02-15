@@ -255,3 +255,30 @@ export const reviewDecision = async (req, res, next) => {
     next(err);
   }
 };
+
+// DELETE decision – creator or admin only
+export const deleteDecision = async (req, res, next) => {
+  try {
+    const decision = await Decision.findById(req.params.id);
+    
+    if (!decision) {
+      return next(new AppError('No decision found with that ID', 404));
+    }
+
+    if (!checkOwnershipOrAdmin(decision, req.user)) {
+      return next(
+        new AppError('You do not have permission to delete this decision', 403)
+      );
+    }
+
+    // Permanently delete
+    await Decision.findByIdAndDelete(req.params.id);
+
+    res.status(204).json({
+      status: 'success',
+      data: null,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
