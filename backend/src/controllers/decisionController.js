@@ -23,57 +23,94 @@ export const createDecision = async (req, res, next) => {
   }
 };
 
-// GET all decisions 
+// ⭐ ENHANCED: GET all decisions with filters, search, and pagination
 export const getAllDecisions = async (req, res, next) => {
   try {
-    const queryObj = { ...req.query };
-    const excludedFields = ['page', 'sort', 'limit', 'fields'];
-    excludedFields.forEach((el) => delete queryObj[el]);
+    const { 
+      page = 1, 
+      limit = 10, 
+      sort,
+      isArchived,
+      status,        
+      category,      
+      priority,      
+      search         
+    } = req.query;
+
+    // Build query object explicitly (safer than spreading all params)
+    const queryObj = {};
 
     // Handle archived filter
-    if (queryObj.isArchived === 'all') {
-      delete queryObj.isArchived; // Show all
-    } else if (queryObj.isArchived === 'true') {
-      queryObj.isArchived = true; // Show only archived
+    if (isArchived === 'all') {
+      // Show all - don't set isArchived
+    } else if (isArchived === 'true') {
+      queryObj.isArchived = true;
     } else {
-      queryObj.isArchived = false; // Show only non-archived (default)
+      queryObj.isArchived = false; 
     }
 
-    //  Role-based visibility
+    // NEW: Status filter
+    if (status && status !== 'all') {
+      queryObj.status = status;
+    }
+
+    // NEW: Category filter
+    if (category && category !== 'all') {
+      queryObj.category = category;
+    }
+
+    // NEW: Priority filter
+    if (priority && priority !== 'all') {
+      queryObj.priority = priority;
+    }
+
+    // Role-based visibility
     if (req.user.role === 'Decision-Maker') {
       queryObj.createdBy = req.user._id; // only own decisions
     } else if (req.user.role === 'Viewer') {
       queryObj.status = 'Approved'; // only approved decisions
     }
-    // Admin sees all → no filter
+    
 
+    
+    if (search) {
+      queryObj.$or = [
+        { title: { $regex: search, $options: 'i' } },           
+        { description: { $regex: search, $options: 'i' } },
+        { rationale: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Build query
     let query = Decision.find(queryObj).populate('createdBy', 'name email');
 
     // Sorting
-    if (req.query.sort) {
-      const sortBy = req.query.sort.split(',').join(' ');
+    if (sort) {
+      const sortBy = sort.split(',').join(' ');
       query = query.sort(sortBy);
     } else {
-      query = query.sort('-createdAt');
+      query = query.sort('-createdAt'); 
     }
 
     // Pagination
-    const page = req.query.page * 1 || 1;
-    const limit = req.query.limit * 1 || 10;
     const skip = (page - 1) * limit;
-    query = query.skip(skip).limit(limit);
+    query = query.skip(skip).limit(parseInt(limit));
 
+    // Execute query
     const decisions = await query;
 
     // Get total count for pagination
     const total = await Decision.countDocuments(queryObj);
+    const totalPages = Math.ceil(total / limit);
 
     res.status(200).json({
       status: 'success',
       results: decisions.length,
-      total: total,
-      page: page,
-      totalPages: Math.ceil(total / limit),
+      total,
+      page: parseInt(page),
+      totalPages,
+      hasNext: page < totalPages,      
+      hasPrev: page > 1,                
       data: { decisions },
     });
   } catch (err) {
@@ -93,7 +130,7 @@ export const getDecision = async (req, res, next) => {
       return next(new AppError('No decision found with that ID', 404));
     }
 
-    //  Permission checks
+    // Permission checks
     if (req.user.role === 'Viewer' && decision.status !== 'Approved') {
       return next(new AppError('You do not have permission to view this decision', 403));
     }
@@ -131,7 +168,7 @@ export const updateDecision = async (req, res, next) => {
       return next(new AppError('No decision found with that ID', 404));
     }
 
-    //  Check if archived
+    // Check if archived
     if (decision.isArchived) {
       return next(new AppError('Cannot update archived decisions. Unarchive first.', 400));
     }
@@ -185,7 +222,7 @@ export const archiveDecision = async (req, res, next) => {
   }
 };
 
-//  NEW: UNARCHIVE decision – creator or admin only
+// UNARCHIVE decision – creator or admin only
 export const unarchiveDecision = async (req, res, next) => {
   try {
     const decision = await Decision.findById(req.params.id);
@@ -217,7 +254,7 @@ export const unarchiveDecision = async (req, res, next) => {
   }
 };
 
-// ✅ NEW: REVIEW decision (Admin only)
+// REVIEW decision (Admin only)
 export const reviewDecision = async (req, res, next) => {
   try {
     const { status } = req.body;

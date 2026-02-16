@@ -1,5 +1,6 @@
 import User from '../models/User.js';
 import AppError from '../utils/AppError.js';
+import bcrypt from 'bcryptjs'; // Make sure to install: npm install bcryptjs
 
 // Set req.params.id to current user
 export const getMe = (req, res, next) => {
@@ -25,9 +26,48 @@ export const getUser = async (req, res, next) => {
   }
 };
 
-// UPDATE current user (self)
+// UPDATE current user (self) - supports profile updates and password change
 export const updateMe = async (req, res, next) => {
   try {
+    // --- Password change flow ---
+    if (req.body.currentPassword && req.body.newPassword) {
+      // 1. Get user with password field
+      const user = await User.findById(req.user._id).select('+password');
+      if (!user) {
+        return next(new AppError('User not found', 404));
+      }
+
+      // 2. Verify current password
+      const isPasswordCorrect = await bcrypt.compare(
+        req.body.currentPassword,
+        user.password
+      );
+      if (!isPasswordCorrect) {
+        return next(new AppError('Current password is incorrect', 401));
+      }
+
+      // Optional: check that new password is different from old
+      if (req.body.currentPassword === req.body.newPassword) {
+        return next(new AppError('New password must be different from current password', 400));
+      }
+
+      // 3. Hash new password
+      const hashedPassword = await bcrypt.hash(req.body.newPassword, 12);
+
+      // 4. Update password and passwordChangedAt
+      user.password = hashedPassword;
+      user.passwordChangedAt = Date.now() - 1000; // subtract 1 second to ensure token is issued after change
+      await user.save();
+
+      // 5. Send response (avoid sending back sensitive data)
+      return res.status(200).json({
+        status: 'success',
+        message: 'Password updated successfully',
+      });
+    }
+
+    // --- Profile update flow (original logic) ---
+    // Prevent password or role updates via this route (unless it's the password change above)
     if (req.body.password || req.body.role) {
       return next(
         new AppError('This route is not for password or role updates', 400)

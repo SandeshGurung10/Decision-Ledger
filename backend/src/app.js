@@ -9,6 +9,9 @@ import decisionRoutes from './routes/decisionRoutes.js';
 
 import errorHandler from './middleware/errorHandler.js';
 import AppError from './utils/AppError.js';
+import statsRoutes from './routes/statsRoutes.js';
+import referenceRoutes from './routes/referenceRoutes.js';
+
 
 const app = express();
 
@@ -23,6 +26,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/decisions', decisionRoutes);
+app.use('/api/v1/stats', statsRoutes);
+app.use('/api/v1', referenceRoutes);
 
 // Basic health check
 app.get('/api/v1/health', (req, res) => {
