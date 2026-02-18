@@ -1,169 +1,150 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router-dom';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import toast from 'react-hot-toast';
-import { ArrowRightIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { ShieldCheckIcon, ArrowRightIcon, EnvelopeIcon, LockClosedIcon } from '@heroicons/react/24/outline';
+import { loginSchema } from '../lib/validations';
+import { useAuthStore } from '../stores/authStore';
+import { login } from '../services/authService';
+import { toast } from 'sonner';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 
-export const Login = () => {
-    const { register, handleSubmit, formState: { errors } } = useForm();
-    const navigate = useNavigate();
+export default function LoginPage() {
+  const navigate = useNavigate();
+  const setAuth = useAuthStore((state) => state.setAuth);
 
-    const onSubmit = async (data) => {
-        try {
-            // API call will go here
-            console.log('Login data', data);
-            toast.success('Logged in successfully!');
-            navigate('/');
-        } catch (error) {
-            toast.error('Failed to log in');
-        }
-    };
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(loginSchema),
+  });
 
-    return (
-        <div className="min-h-screen flex">
-            {/* Left Side - Branding */}
-            <motion.div 
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.6 }}
-                className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 p-12 flex-col justify-between relative overflow-hidden"
-            >
-                {/* Decorative Elements */}
-                <div className="absolute inset-0 opacity-10">
-                    <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl"></div>
-                    <div className="absolute bottom-0 right-0 w-96 h-96 bg-indigo-500 rounded-full blur-3xl"></div>
-                </div>
+  const onSubmit = async (data) => {
+    try {
+      const res = await login(data);
+      const { token, data: userData } = res.data;
+      setAuth(userData.user, token);
+      toast.success('Access Granted: Welcome to Decision Ledger');
+      navigate('/');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Authentication Failed');
+    }
+  };
 
-                <div className="relative z-10">
-                    <div className="flex items-center space-x-3 mb-16">
-                        <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
-                            <ShieldCheckIcon className="w-7 h-7 text-white" />
-                        </div>
-                        <h1 className="text-2xl font-bold text-white tracking-tight">Decision Ledger</h1>
-                    </div>
+  return (
+    <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50 selection:bg-primary-100">
 
-                    <div className="space-y-6">
-                        <h2 className="text-4xl font-bold text-white leading-tight">
-                            Transparent Decision<br />
-                            Making for Modern<br />
-                            Organizations
-                        </h2>
-                        <p className="text-blue-200 text-lg max-w-md">
-                            Document, track, and analyze organizational decisions with full accountability and transparency.
-                        </p>
-                    </div>
-                </div>
-
-                {/* Stats */}
-                <div className="relative z-10 grid grid-cols-3 gap-8">
-                    <div>
-                        <div className="text-3xl font-bold text-white">500+</div>
-                        <div className="text-sm text-blue-300">Decisions Tracked</div>
-                    </div>
-                    <div>
-                        <div className="text-3xl font-bold text-white">98%</div>
-                        <div className="text-sm text-blue-300">Transparency</div>
-                    </div>
-                    <div>
-                        <div className="text-3xl font-bold text-white">24/7</div>
-                        <div className="text-sm text-blue-300">Access</div>
-                    </div>
-                </div>
-            </motion.div>
-
-            {/* Right Side - Login Form */}
-            <div className="flex-1 flex items-center justify-center p-8 bg-white">
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.2 }}
-                    className="w-full max-w-md"
-                >
-                    {/* Mobile Logo */}
-                    <div className="lg:hidden flex items-center space-x-3 mb-8">
-                        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-                            <ShieldCheckIcon className="w-6 h-6 text-white" />
-                        </div>
-                        <h1 className="text-xl font-bold text-slate-900">Decision Ledger</h1>
-                    </div>
-
-                    <div className="mb-8">
-                        <h3 className="text-3xl font-bold text-slate-900 mb-2">Welcome back</h3>
-                        <p className="text-slate-600">Enter your credentials to access your account</p>
-                    </div>
-
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                        {/* Email Input */}
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
-                                Email Address
-                            </label>
-                            <input
-                                type="email"
-                                id="email"
-                                placeholder="you@example.com"
-                                className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-xl transition-all duration-200 outline-none focus:bg-white focus:border-blue-500 ${
-                                    errors.email ? 'border-red-400' : 'border-transparent'
-                                }`}
-                                {...register('email', {
-                                    required: 'Email is required',
-                                    pattern: {
-                                        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                                        message: 'Invalid email address'
-                                    }
-                                })}
-                            />
-                            {errors.email && (
-                                <p className="mt-2 text-sm text-red-600">{errors.email.message}</p>
-                            )}
-                        </div>
-
-                        {/* Password Input */}
-                        <div>
-                            <div className="flex items-center justify-between mb-2">
-                                <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-                                    Password
-                                </label>
-                                <a href="#" className="text-sm text-blue-600 hover:text-blue-700">
-                                    Forgot password?
-                                </a>
-                            </div>
-                            <input
-                                type="password"
-                                id="password"
-                                placeholder="••••••••"
-                                className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-xl transition-all duration-200 outline-none focus:bg-white focus:border-blue-500 ${
-                                    errors.password ? 'border-red-400' : 'border-transparent'
-                                }`}
-                                {...register('password', {
-                                    required: 'Password is required'
-                                })}
-                            />
-                            {errors.password && (
-                                <p className="mt-2 text-sm text-red-600">{errors.password.message}</p>
-                            )}
-                        </div>
-
-                        {/* Submit Button */}
-                        <button
-                            type="submit"
-                            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 px-6 rounded-xl font-medium hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2 group shadow-lg shadow-blue-500/30"
-                        >
-                            <span>Sign In</span>
-                            <ArrowRightIcon className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                        </button>
-                    </form>
-
-                    {/* Register Link */}
-                    <p className="mt-8 text-center text-sm text-slate-600">
-                        Don't have an account?{' '}
-                        <Link to="/register" className="text-blue-600 hover:text-blue-700 font-medium">
-                            Create an account
-                        </Link>
-                    </p>
-                </motion.div>
-            </div>
+      {/* Left Decoration Side */}
+      <motion.div
+        initial={{ opacity: 0, x: -50 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+        className="hidden lg:flex lg:w-1/2 bg-slate-900 p-12 flex-col justify-between relative overflow-hidden"
+      >
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-500 rounded-full blur-[120px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500 rounded-full blur-[120px]" />
         </div>
-    );
-};
+
+        <div className="relative z-10 flex items-center gap-3">
+          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-2xl">
+            <ShieldCheckIcon className="w-8 h-8 text-primary-600" />
+          </div>
+          <h1 className="text-2xl font-black text-white tracking-tighter">Decision Ledger</h1>
+        </div>
+
+        <div className="relative z-10 space-y-6">
+          <h2 className="text-6xl font-black text-white leading-none tracking-tight">
+            Structure Your <span className="text-primary-400">Governance.</span>
+          </h2>
+          <p className="text-slate-400 text-xl font-medium max-w-md">
+            The professional standard for documenting, tracking, and analyzing organizational logic.
+          </p>
+        </div>
+
+        <div className="relative z-10 flex gap-8">
+          <div>
+            <p className="text-2xl font-black text-white">100%</p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Traceable</p>
+          </div>
+          <div>
+            <p className="text-2xl font-black text-white">Real-time</p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Analytics</p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Right Login Side */}
+      <div className="flex-1 flex items-center justify-center p-8 lg:p-24">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+          className="w-full max-w-md space-y-8"
+        >
+          <div className="space-y-2">
+            <h3 className="text-4xl font-black text-slate-900 tracking-tight">Sign In</h3>
+            <p className="text-slate-500 font-medium italic">Welcome back to the command center.</p>
+          </div>
+
+          <Card className="border-none shadow-2xl ring-1 ring-slate-200/50 p-2">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">Security Credentials</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                <Input
+                  label="Business Email"
+                  id="email"
+                  type="email"
+                  icon={EnvelopeIcon}
+                  placeholder="name@company.com"
+                  {...register('email')}
+                  error={errors.email?.message}
+                />
+
+                <div className="space-y-1">
+                  <Input
+                    label="Secret Keyword"
+                    id="password"
+                    type="password"
+                    icon={LockClosedIcon}
+                    placeholder="••••••••"
+                    {...register('password')}
+                    error={errors.password?.message}
+                  />
+                  <div className="text-right">
+                    <button type="button" className="text-xs font-bold text-primary-600 hover:text-primary-700 transition-colors uppercase tracking-widest">
+                      Forgot Access?
+                    </button>
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-14 text-lg"
+                  disabled={isSubmitting}
+                  icon={ArrowRightIcon}
+                >
+                  {isSubmitting ? 'Verifying...' : 'Establish Connection'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <p className="text-center text-slate-500 font-bold text-sm">
+            Operational onboard required?{' '}
+            <Link to="/register" className="text-primary-600 hover:text-primary-700 underline underline-offset-4 decoration-2">
+              Request Access
+            </Link>
+          </p>
+        </motion.div>
+      </div>
+    </div>
+  );
+}

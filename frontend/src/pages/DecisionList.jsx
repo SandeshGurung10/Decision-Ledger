@@ -1,159 +1,240 @@
-import React, { useEffect, useState } from 'react';
-import { api } from '../context/AuthContext';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import {
+    PlusIcon,
+    FunnelIcon,
+    MagnifyingGlassIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon
+} from '@heroicons/react/20/solid';
+import { useDecisions } from '../hooks/useDecisions';
+import { useAuthStore } from '../stores/authStore';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
+import { Input } from '../components/ui/Input';
+
+const CATEGORIES = ['Strategic', 'Operational', 'Financial', 'HR', 'Technical', 'Other'];
+const STATUSES = ['Draft', 'Under Review', 'Approved', 'Rejected', 'Implemented'];
 
 export const DecisionList = () => {
-    const [decisions, setDecisions] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const { user } = useAuthStore();
     const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
+    const [search, setSearch] = useState('');
     const [filters, setFilters] = useState({ status: '', category: '' });
+    const [archiveFilter, setArchiveFilter] = useState('false'); // 'false' = active, 'true' = archived, 'all' = both
 
+    // Build query params
+    const params = {
+        page,
+        limit: 8,
+        sort: '-createdAt',
+        ...filters,
+        ...(archiveFilter !== 'all' && { isArchived: archiveFilter }),
+        ...(search && { search }),
+    };
+
+    // Fetch decisions with React Query
+    const { data, isLoading, isError, refetch } = useDecisions(params);
+
+    const decisions = data?.data?.decisions || [];
+    const totalPages = Math.ceil((data?.total || 0) / 8);
+
+    // Reset page when filters change
     useEffect(() => {
-        fetchDecisions();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, filters]);
+        setPage(1);
+    }, [search, filters, archiveFilter]);
 
-    const fetchDecisions = async () => {
-        setLoading(true);
-        try {
-            let query = `/decisions?page=${page}&limit=10&sort=-createdAt`;
-            if (filters.status) query += `&status=${filters.status}`;
-            if (filters.category) query += `&category=${filters.category}`;
+    const handleFilterChange = (name, value) => {
+        setFilters(prev => ({ ...prev, [name]: value }));
+    };
 
-            const res = await api.get(query);
-            setDecisions(res.data.data.decisions);
-            // Basic pagination logic assuming total count is returned or approximated
-            // In a real app, API should return total count for exact pagination
-            setTotalPages(Math.ceil((res.data.results || 10) / 10));
-        } catch (error) {
-            console.error('Failed to fetch decisions', error);
-        } finally {
-            setLoading(false);
+    const getStatusVariant = (status) => {
+        switch (status.toLowerCase()) {
+            case 'approved': return 'success';
+            case 'implemented': return 'primary';
+            case 'under review': return 'warning';
+            case 'rejected': return 'danger';
+            default: return 'default';
         }
     };
 
-    const handleFilterChange = (e) => {
-        setFilters({ ...filters, [e.target.name]: e.target.value });
-        setPage(1); // Reset to first page on filter change
-    };
-
     return (
-        <div>
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold">Decisions</h2>
-                <Link to="/decisions/new">
-                    <Button>New Decision</Button>
-                </Link>
+        <div className="space-y-8">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Decisions</h1>
+                    <p className="text-slate-500 font-medium">Browse and manage organizational outcomes.</p>
+                </div>
+                {['Admin', 'Decision-Maker'].includes(user?.role) && (
+                    <Link to="/decisions/new">
+                        <Button icon={PlusIcon}>New Decision</Button>
+                    </Link>
+                )}
             </div>
 
-            {/* Filters */}
-            <Card className="mb-6 p-4">
-                <div className="flex flex-wrap gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                        <select
-                            name="status"
-                            value={filters.status}
-                            onChange={handleFilterChange}
-                            className="mt-1 block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm border"
-                        >
-                            <option value="">All Statuses</option>
-                            <option value="Draft">Draft</option>
-                            <option value="Under Review">Under Review</option>
-                            <option value="Approved">Approved</option>
-                            <option value="Rejected">Rejected</option>
-                        </select>
+            {/* Filter Bar */}
+            <Card className="p-4 bg-white/50 border-none ring-1 ring-slate-200/50 shadow-sm">
+                <div className="flex flex-col lg:flex-row gap-4 items-end">
+                    <div className="flex-1 w-full">
+                        <Input
+                            icon={MagnifyingGlassIcon}
+                            placeholder="Search decisions..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="mb-0"
+                        />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                        <select
-                            name="category"
-                            value={filters.category}
-                            onChange={handleFilterChange}
-                            className="mt-1 block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm border"
-                        >
-                            <option value="">All Categories</option>
-                            {['Strategic', 'Operational', 'Financial', 'HR', 'Technical', 'Other'].map(cat => (
-                                <option key={cat} value={cat}>{cat}</option>
-                            ))}
-                        </select>
+                    <div className="flex flex-wrap gap-4 w-full lg:w-auto">
+                        {/* Status Filter */}
+                        <div className="flex-1 min-w-[140px]">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Status</label>
+                            <select
+                                className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary-500 transition-all font-semibold text-sm"
+                                value={filters.status}
+                                onChange={(e) => handleFilterChange('status', e.target.value)}
+                            >
+                                <option value="">All Statuses</option>
+                                {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
+                        {/* Category Filter */}
+                        <div className="flex-1 min-w-[140px]">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Category</label>
+                            <select
+                                className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary-500 transition-all font-semibold text-sm"
+                                value={filters.category}
+                                onChange={(e) => handleFilterChange('category', e.target.value)}
+                            >
+                                <option value="">All Categories</option>
+                                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+                        {/* Archive Filter */}
+                        <div className="flex-1 min-w-[140px]">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Archive</label>
+                            <select
+                                className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary-500 transition-all font-semibold text-sm"
+                                value={archiveFilter}
+                                onChange={(e) => setArchiveFilter(e.target.value)}
+                            >
+                                <option value="false">Active Only</option>
+                                <option value="true">Archived Only</option>
+                                <option value="all">All Decisions</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </Card>
 
-            {/* List */}
-            <Card className="overflow-hidden p-0">
-                {loading ? (
-                    <div className="p-8 text-center text-gray-500">Loading decisions...</div>
-                ) : decisions.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500">No decisions found matching your criteria.</div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
+            {/* Table Section */}
+            <Card className="p-0 overflow-hidden border-none ring-1 ring-slate-200/50 shadow-sm">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-100">
+                        <thead className="bg-slate-50/50">
+                            <tr>
+                                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Decision Info</th>
+                                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Metadata</th>
+                                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
+                                <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-slate-100">
+                            {isLoading ? (
+                                [...Array(5)].map((_, i) => (
+                                    <tr key={i} className="animate-pulse">
+                                        <td colSpan="4" className="px-8 py-6 h-20 bg-slate-50/20" />
+                                    </tr>
+                                ))
+                            ) : isError ? (
                                 <tr>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created By</th>
-                                    <th scope="col" className="relative px-6 py-3">
-                                        <span className="sr-only">View</span>
-                                    </th>
+                                    <td colSpan="4" className="px-8 py-20 text-center">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <FunnelIcon className="w-12 h-12 text-slate-200" />
+                                            <p className="font-bold text-slate-400 text-lg">Error loading decisions</p>
+                                            <Button variant="outline" onClick={() => refetch()}>Try Again</Button>
+                                        </div>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {decisions.map((decision) => (
-                                    <tr key={decision._id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-medium text-gray-900">{decision.title}</div>
+                            ) : decisions.length === 0 ? (
+                                <tr>
+                                    <td colSpan="4" className="px-8 py-20 text-center">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <FunnelIcon className="w-12 h-12 text-slate-200" />
+                                            <p className="font-bold text-slate-400 text-lg">No decisions discovered yet</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                decisions.map((decision) => (
+                                    <tr key={decision._id} className="hover:bg-slate-50/80 transition-all group">
+                                        <td className="px-8 py-6">
+                                            <div className="max-w-md">
+                                                <p className="font-bold text-slate-900 group-hover:text-primary-600 transition-colors line-clamp-1">
+                                                    {decision.title}
+                                                </p>
+                                                <p className="text-xs text-slate-400 font-medium mt-1">
+                                                    {new Date(decision.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                                </p>
+                                            </div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-gray-500">{decision.category}</div>
+                                        <td className="px-8 py-6">
+                                            <div className="flex flex-col gap-1.5">
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant="primary" className="px-2 py-0">{decision.category}</Badge>
+                                                    <Badge variant={decision.priority.toLowerCase() === 'critical' ? 'danger' : decision.priority.toLowerCase() === 'high' ? 'warning' : 'default'} className="px-2 py-0">
+                                                        {decision.priority}
+                                                    </Badge>
+                                                </div>
+                                                <p className="text-[10px] font-bold text-slate-400">by {decision.createdBy?.name}</p>
+                                            </div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800`}>
+                                        <td className="px-8 py-6">
+                                            <Badge variant={getStatusVariant(decision.status)}>
                                                 {decision.status}
-                                            </span>
+                                            </Badge>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {decision.createdBy?.name || 'Unknown'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <Link to={`/decisions/${decision._id}`} className="text-primary-600 hover:text-primary-900">
-                                                View
+                                        <td className="px-8 py-6 text-right">
+                                            <Link to={`/decisions/${decision._id}`}>
+                                                <Button variant="ghost" className="text-xs font-bold uppercase tracking-wider h-8 py-0">Details</Button>
                                             </Link>
                                         </td>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </Card>
 
-            {/* Pagination Controls */}
-            <div className="flex items-center justify-between mt-4">
-                <Button
-                    variant="secondary"
-                    disabled={page === 1}
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                >
-                    Previous
-                </Button>
-                <span className="text-sm text-gray-600">
-                    Page {page} of {totalPages}
-                </span>
-                <Button
-                    variant="secondary"
-                    disabled={page >= totalPages}
-                    onClick={() => setPage(p => p + 1)}
-                >
-                    Next
-                </Button>
-            </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between px-2 pb-10">
+                    <p className="text-sm font-bold text-slate-400">
+                        Page <span className="text-slate-900">{page}</span> of <span className="text-slate-900">{totalPages}</span>
+                    </p>
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            className="px-3"
+                            disabled={page === 1}
+                            onClick={() => setPage(p => p - 1)}
+                        >
+                            <ChevronLeftIcon className="w-5 h-5" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            className="px-3"
+                            disabled={page === totalPages}
+                            onClick={() => setPage(p => p + 1)}
+                        >
+                            <ChevronRightIcon className="w-5 h-5" />
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
